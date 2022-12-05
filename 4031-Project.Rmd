@@ -58,14 +58,14 @@ Exporting the data to ExpertFit to fit distribution and test normality.
 ## a. Data Summary
 ``` {r data_description, echo=FALSE}
 #2019
-n_math_2019 = integer(length(data$All.Students.Math.Achievement))
+n_math_2019 = length(data$All.Students.Math.Achievement)
 mean_math_2019 = mean(data$All.Students.Math.Achievement)
 median_math_2019 = median(data$All.Students.Math.Achievement)
 range_math_2019_lower = min(data$All.Students.Math.Achievement)
 range_math_2019_upper = max(data$All.Students.Math.Achievement) 
 sd_math_2019 = sd(data$All.Students.Math.Achievement)
 #2021
-n_math_2021 = integer(length(data$X2021.All.Students.Math.Achievement))
+n_math_2021 = length(data$X2021.All.Students.Math.Achievement)
 mean_math_2021 = mean(data$X2021.All.Students.Math.Achievement)
 median_math_2021 = median(data$X2021.All.Students.Math.Achievement)
 range_math_2021_lower = min(data$X2021.All.Students.Math.Achievement)
