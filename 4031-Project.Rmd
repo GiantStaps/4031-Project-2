@@ -125,7 +125,7 @@ y_values_1 <- dnorm(x_values_1, mean = mean(data$X2021.All.Students.Math.Achieve
 y_values_1 <- y_values_1 * diff(h2$mids[1:2]) * length(data$X2021.All.Students.Math.Achievement) 
 lines(x_values_1, y_values_1, lwd = 2)
 ```
-From both years' histogram, it can be confirmed that there is a very low frequency of math achievement rate between 0-30 for the 2019 data, as compared to the 2021 data. More outliers in the 2019 data could mean a higher . From plain sight, the 2019 data is better approximated by a normal distribution. The 2021 data seems skewed to the center.
+From both years' histogram, it can be confirmed that there is a very low frequency of math achievement rate between 0-30 for the 2019 data, as compared to the 2021 data. More outliers in the 2019 data could mean a higher . From plain sight, the 2019 data is better approximated by a normal distribution. The 2021 data seems skewed to the center. Skewed to the center
 
 ## d. Table of Variables
 ```{r, echo=FALSE}
