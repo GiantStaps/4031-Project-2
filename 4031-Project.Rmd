@@ -1,0 +1,699 @@
+---
+title: "ISyE 4031 T09 - Georgia Achievement Gaps in K-12 Schools with Regression"
+author: "Ruwei Ma, Yichen Ma, Yang Yang"
+output: pdf_document
+---
+# 1. Introduction
+Covid-19 had brought a big impact to the education system across US. National test results for 2022 reveal the pandemic’s devastating effects on American schoolchildren, with the performance of 9-year-olds in math and reading dropping to the lowest levels from two decades ago [1]. This lagging effect from the pandemic applies to all races and income levels and sparks a collective decline in academics for the generation that experienced school closures, frequent reliance on virtual and remote learning, and other pandemic effects. The setbacks will occupy the low-performing students for up to 9 months to catch up with the average, prompting an urgent need for the underlying solution to the achievement gap [2]. This setback further adds to, and likely aggravates, the pre-pandemic disparity in student achievement outcomes for vulnerable and at-risk student populations, especially in Georgia. Based on some of my preliminary analysis of the 2021 achievement data across 2,180 schools in Georgia, we found that there are 2 prominent factors that affect achievement rate: the student’s economic status and race. The achievement rate in 2021 of economically disadvantaged students is 46.11%, compared to 52.32% across all students. A similar gap can be observed in the difference in achievement rate between white and black students in Georgia, the former as high as 66.99%, compared to the 39.88% of the latter. The gap within the economically-disadvantaged students’ group is vast and depends on the county or school they attend. Further analysis at the school level shows strong correlation between achievement rate and the school’s other demographics.
+
+# 2. Problem Goal
+We aim to adopt regression modeling to identify gaps in national test achievement rates between different demographic groups in Georgia, and recommend robust strategies to address such disparities. Specifically, the objectives are: (1) visualize the disparities in school resources, such as teacher certifications and FTE (Full-time Equivalent), and quantify its correlation with the student’s achievement outcomes, especially among marginalized minority groups (e.g., White, Black, vs. Hispanic students, economically disadvantaged vs. affluent students, and rural vs. Urban schools) (2) quantify the achievement gap at the county level across Georgia’s 159 counties at the school level to identify factors that predict student achievement and highlight intervention or resource allocation strategies, and (3) evaluate the impact and predict the trajectory of the policies and strategies produced from step 2 with adjustments. 
+
+# 3. Executive Summary 
+
+
+
+
+# 4. Data Description
+``` {r data_prep, include=FALSE}
+# Input Dataset
+library(readxl)
+library(dplyr)
+Achievement_Rate = read.csv("2019 & 2021 Content Mastery Data.csv", header=TRUE)
+Percentage = read.csv("Percentages & Certificates.csv", header=TRUE)
+Salaries = read.csv("salaries.csv", header=TRUE)
+Absent_Rate = read.csv("Absent Rate.csv", header=TRUE)
+School_Expenditure = read_excel("2021_School-Level_PPE.xls")
+School_Expenditure = select(School_Expenditure, schoolname, amount, school_ppe_21)
+Poverty.Percentage = read_excel("2021_directly_certified_school.xls")
+Poverty.Percentage = select(Poverty.Percentage, SCHOOL_NAME, direct_cert_perc)
+Mobility = read_excel("2021_School_Mobility.xls")
+Mobility = select(Mobility, school_name, mobility)
+Enrollment = read.csv("Enrollment_by_Subgroups_Programs.csv", header=TRUE)
+Enrollment = select(Enrollment, INSTN_NAME, ENROLL_PCT_GIFTED)
+
+data = merge(Achievement_Rate, Percentage, by="School.Name")
+data = merge(data, Salaries, by="School.Name")
+data = merge(data, Absent_Rate, by="School.Name")
+data = merge(data, School_Expenditure, by.x="School.Name", by.y="schoolname")
+data = merge(data, Poverty.Percentage, by.x="School.Name", by.y="SCHOOL_NAME")
+data = merge(data, Mobility, by.x="School.Name", by.y="school_name")
+data = merge(data, Enrollment, by.x="School.Name", by.y="INSTN_NAME")
+attach(data)
+
+# Creating a Dummy Variable for Urban/Rural
+data$u.r_dummy <- data$Urban.Rural  
+data$u.r_dummy <- as.character(data$u.r_dummy) 
+data$u.r_dummy[data$u.r_dummy == "Urban"] <- 1
+data$u.r_dummy[data$u.r_dummy == "Rural"] <- 0
+data$u.r_dummy <- as.numeric(data$u.r_dummy)
+data$growth.rate.math <-data$X19.21.Difference.in.Math / data$All.Students.Math.Achievement
+```
+
+## a. Data Summary
+``` {r data_description, echo=FALSE}
+#2019
+mean_math_2019 = mean(data$All.Students.Math.Achievement)
+median_math_2019 = median(data$All.Students.Math.Achievement)
+range_math_2019_lower = min(data$All.Students.Math.Achievement)
+range_math_2019_upper = max(data$All.Students.Math.Achievement) 
+#2021
+mean_math_2021 = mean(data$X2021.All.Students.Math.Achievement)
+median_math_2021 = median(data$X2021.All.Students.Math.Achievement)
+range_math_2021_lower = min(data$X2021.All.Students.Math.Achievement)
+range_math_2021_upper = max(data$X2021.All.Students.Math.Achievement)
+```
+
+```{r, echo=FALSE}
+library(huxtable)
+ht <- hux(firstcol = c('', 'Avg. Math achievement', 'Median Math achievement', 
+                       'Lower Bound of Math achievement',
+                       'Upper Bound of Math achievement'),
+          a2019 = c('2019', mean_math_2019, median_math_2019,
+                    range_math_2019_lower, range_math_2019_upper),
+          a2021 = c('2021', mean_math_2021, median_math_2021,
+                    range_math_2021_lower, range_math_2021_upper),
+          add_colnames = FALSE)
+bold(ht)[1,]           <- TRUE
+align(ht)[,2]          <- "left"
+font_size(ht)          <- 9
+col_width(ht)          <- c(1.6, 1, 1)
+number_format(ht[2,])  <- 2
+head(theme_plain(ht), 5L)
+```
+
+Avg. Math achievement across all students in 2019: $\fbox{67.99686463672}$.\
+Median Math achievement across all students in 2019: $\fbox{69.34}$.\
+Range of Math achievement across all students in 2019: $\fbox{[2.88, 100]}$.\
+
+Avg. Math achievement across all students in 2021: $\fbox{52.2312059089539}$.\
+Median Math achievement across all students in 2021: $\fbox{52.24}$.\
+Range of Math achievement across all students in 2021: $\fbox{[0, 100]}$.
+
+```{r}
+#average change in achievement rate
+(52.23121-67.99686)/67.99686
+```
+
+## c. Data Visulization
+```{r boxplots, echo=FALSE}
+#boxplots
+par(mfrow=c(1,2))
+b1<-boxplot(data$All.Students.Math.Achievement,main = "2019 Math Achievement Rate")
+b2<-boxplot(data$X2021.All.Students.Math.Achievement, main="2021 Math Achievement Rate")
+```
+The boxplot of both years' math achievement rate shows that in 2019, the data distribution is more compact, and all quartiles are significantly higher than those in 2021. A tremendous number of outliers are identified in both year's boxplots, suggesting many data points below the lower quartile by more than 1.5 interquartile range (IQR). Achievement rates are highly left skewed. 
+
+```{r histogram, echo=FALSE}
+#histogram for 2019, 2021
+
+par(mfrow=c(1,2))
+h1 <-hist(data$All.Students.Math.Achievement,main = "2019 Math Achievement Rate",xlab="2019 All Students Math Achievement Rate", 
+     ylim = c(0,900), breaks=10,xlim = c(0,100))
+
+#2019 normal curve
+x_values <- seq(min(data$All.Students.Math.Achievement), max(data$All.Students.Math.Achievement), length = 100)
+y_values <- dnorm(x_values, mean = mean(data$All.Students.Math.Achievement), sd = sd(data$All.Students.Math.Achievement)) 
+y_values <- y_values * diff(h1$mids[1:2]) * length(data$All.Students.Math.Achievement) 
+lines(x_values, y_values, lwd = 2)
+
+#2021 normal curve
+h2 <- hist(data$X2021.All.Students.Math.Achievement,main = "2021 Math Achievement Rate", xlab = "2021 All Students Math Achievement Rate",
+     ylim = c(0,900), breaks=10,xlim = c(0,100))
+x_values_1 <- seq(min(data$X2021.All.Students.Math.Achievement), max(data$X2021.All.Students.Math.Achievement), length = 100)
+y_values_1 <- dnorm(x_values_1, mean = mean(data$X2021.All.Students.Math.Achievement), sd = sd(data$X2021.All.Students.Math.Achievement)) 
+y_values_1 <- y_values_1 * diff(h2$mids[1:2]) * length(data$X2021.All.Students.Math.Achievement) 
+lines(x_values_1, y_values_1, lwd = 2)
+```
+From both years' histogram, it can be confirmed that there is a very low frequency of math achievement rate between 0-30 for the 2019 data, as compared to the 2021 data. More outliers in the 2019 data could mean a higher . From plain sight, the 2019 data is better approximated by a normal distribution. The 2021 data seems skewed to the center.
+
+## d. Table of Variables
+```{r, echo=FALSE}
+library(huxtable)
+ht <- hux(Variables = c('y1', 'y2', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6',
+                        'x7', 'x8', 'x9', 'x10', 'x11', 'x12', 'x13', 'x14',
+                        'x15', 'x16', 'x17', 'x18', 'x19', 'x20'),
+          Description = c('2019 All Students Math Achievement Rate', 
+                          '2021 All Students Math Achievement Rate',
+                          'Absent 0-5 Days Percentage', 
+                          'Absent 6-15 Days Percentage', 
+                          'Absent 15+ Days Percentage', 
+                          'Avg. Annual Salaries - Administrators', 
+                          'Avg. Annual Salaries - Teachers', 
+                          'Avg. Annual Salaries - Support.Personnel', 
+                          'Number of Teachers with a phd degree', 
+                          'Total Number of Certified Teachers', 
+                          'Post Grad Percentage', 
+                          'Total Students Enrolled', 
+                          'Teacher-Student Ratio', 
+                          'White Student Percentage', 
+                          'Black Student Percentage', 
+                          'Economically Disadvantaged Student Percentage', 
+                          'Directly Certified Students Percentage',
+                          'Amount of Money Invested for Students', 
+                          'Per-Pupil Expenditure at School Level', 
+                          'Rate of Entries and Withdrawls to a School',
+                          'Percentage of Gifted Students',
+                          'Urban/Rural Area of the School'),
+          Type = c('Quantative', 'Quantative', 'Quantative', 'Quantative', 'Quantative',
+                   'Quantative', 'Quantative', 'Quantative', 'Quantative', 'Quantative', 
+                   'Quantative', 'Quantative', 'Quantative', 'Quantative', 'Quantative', 
+                   'Quantative', 'Quantative', 'Quantative', 'Quantative', 'Quantative',
+                   'Quantative', 'Qualitative'),
+          add_colnames = TRUE)
+bold(ht)[1,]           <- TRUE
+align(ht)[,2]          <- "left"
+font_size(ht)          <- 9
+col_width(ht)          <- c(0.4, 1.6, 0.8)
+number_format(ht)      <- 0
+```
+
+\newpage
+```{r, echo=FALSE}
+head(theme_plain(ht), 24L)
+```
+
+# 5. Regression Analysis
+
+## a. Iterations of the analysis process
+- paragraph description
+
+
+\newpage
+## c. Plots of variables- Scatterplot 
+For the plots below, a light blue color indicates Urban Area and a light pink color indicates Rural Area. 
+``` {r scatterplot, echo=FALSE}
+# Only Includes the Numeric Data
+library(dplyr)
+data_numeric = select_if(data, is.numeric)
+data_numeric = data.frame(data_numeric$All.Students.Math.Achievement, 
+                          data_numeric$X2021.All.Students.Math.Achievement, 
+                          data_numeric$Absent...5D.Percentage, 
+                          data_numeric$Absent.6D.15D.Percentage, 
+                          data_numeric$Absent..15D.Percentage, 
+                          data_numeric$Avg..Annual.Salaries.Administrators, 
+                          data_numeric$Avg..Annual.Salaries.Teachers, 
+                          data_numeric$Avg..Annual.Salaries.Support.Personnel, 
+                          data_numeric$phd, 
+                          data_numeric$Total, 
+                          data_numeric$Post.Grad.Percentage, 
+                          data_numeric$Total.Students.Enrolled, 
+                          data_numeric$Teacher.Student.Ratio, 
+                          data_numeric$White.Percentage, 
+                          data_numeric$Black.Percentage,
+                          data_numeric$Econ.Disadvantaged.Percentage, 
+                          data_numeric$direct_cert_perc,
+                          data_numeric$amount, 
+                          data_numeric$school_ppe_21,
+                          data_numeric$mobility, 
+                          data_numeric$ENROLL_PCT_GIFTED,
+                          data_numeric$u.r_dummy)
+colnames(data_numeric) <- c('y1', 'y2',
+                            'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8',
+                            'x9', 'x10', 'x11', 'x12', 'x13', 'x14', 'x15',
+                            'x16', 'x17', 'x18', 'x19', 'x20')
+
+# Plot With Outliers
+# par(mfrow=c(2,3))
+# y=data_numeric$y1
+# plot(data_numeric$x1, y)
+# plot(data_numeric$x2, y)
+# plot(data_numeric$x3, y)
+# plot(data_numeric$x4, y)
+# plot(data_numeric$x5, y)
+# plot(data_numeric$x6, y)
+# plot(data_numeric$x7, y)
+# par(mfrow=c(2,3))
+# plot(data_numeric$x8, y)
+# plot(data_numeric$x9, y)
+# plot(data_numeric$x10, y)
+# plot(data_numeric$x11, y)
+# plot(data_numeric$x12, y)
+# plot(data_numeric$x13, y)
+# par(mfrow=c(2,3))
+# plot(data_numeric$x14, y)
+# plot(data_numeric$x15, y)
+# plot(data_numeric$x16, y)
+# plot(data_numeric$x17, y)
+# plot(data_numeric$x18, y)
+# plot(data_numeric$x19, y)
+
+# Create a backup numeric dataset with outliers
+data_numeric_backup = data_numeric
+
+# Removing outliers for each variable using 1.5 IQR method
+for (i in 1:(ncol(data_numeric)-2)) {
+  quartiles <- quantile(data_numeric[ ,i], probs=c(.25, .75), na.rm=FALSE)
+  IQR <- IQR(data_numeric[ ,i])
+  Lower <- quartiles[1] - 1.5*IQR
+  Upper <- quartiles[2] + 1.5*IQR 
+  data_numeric[ ,i][(data_numeric[ ,i] < Lower) | (data_numeric[ ,i] > Upper)] <- NaN
+}
+# Plot Without Outliers
+
+
+# Histograms
+library(tidyr)
+c1 <- rgb(173,216,230,max = 255, alpha = 80, names = "lt.blue")
+c2 <- rgb(255,192,203, max = 255, alpha = 80, names = "lt.pink")
+
+par(mfrow=c(2,3))
+for (i in 1:6) {
+  A = data_numeric[data_numeric$x20 == 1, ][, i]
+  B = data_numeric[data_numeric$x20 == 0, ][, i]
+  b <- min(c(A,B), na.rm = TRUE)
+  e <- max(c(A,B), na.rm = TRUE)
+  ax <- pretty(b:e, n = 12)
+  hgA <- hist(A, breaks = ax, plot = FALSE) # Save first histogram data
+  hgB <- hist(B, breaks = ax, plot = FALSE) # Save 2nd histogram data
+  plot(hgA, col = c1, main = names(data_numeric)[i])
+  plot(hgB, col = c2, add = TRUE)
+}
+
+par(mfrow=c(2,3))
+for (i in 7:10) {
+  A = data_numeric[data_numeric$x20 == 1, ][, i]
+  B = data_numeric[data_numeric$x20 == 0, ][, i]
+  b <- min(c(A,B), na.rm = TRUE)
+  e <- max(c(A,B), na.rm = TRUE)
+  ax <- pretty(b:e, n = 12)
+  hgA <- hist(A, breaks = ax, plot = FALSE) # Save first histogram data
+  hgB <- hist(B, breaks = ax, plot = FALSE) # Save 2nd histogram data
+  plot(hgA, col = c1, main = names(data_numeric)[i])
+  plot(hgB, col = c2, add = TRUE)
+}
+
+for (i in 12:13) {
+  A = data_numeric[data_numeric$x20 == 1, ][, i]
+  B = data_numeric[data_numeric$x20 == 0, ][, i]
+  b <- min(c(A,B), na.rm = TRUE)
+  e <- max(c(A,B), na.rm = TRUE)
+  ax <- pretty(b:e, n = 12)
+  hgA <- hist(A, breaks = ax, plot = FALSE) # Save first histogram data
+  hgB <- hist(B, breaks = ax, plot = FALSE) # Save 2nd histogram data
+  plot(hgA, col = c1, main = names(data_numeric)[i])
+  plot(hgB, col = c2, add = TRUE)
+}
+
+par(mfrow=c(2,3))
+for (i in 14:19) {
+  A = data_numeric[data_numeric$x20 == 1, ][, i]
+  B = data_numeric[data_numeric$x20 == 0, ][, i]
+  b <- min(c(A,B), na.rm = TRUE)
+  e <- max(c(A,B), na.rm = TRUE)
+  ax <- pretty(b:e, n = 12)
+  hgA <- hist(A, breaks = ax, plot = FALSE) # Save first histogram data
+  hgB <- hist(B, breaks = ax, plot = FALSE) # Save 2nd histogram data
+  plot(hgA, col = c1, main = names(data_numeric)[i])
+  plot(hgB, col = c2, add = TRUE)
+}
+
+
+# par(mfrow=c(2,3))
+# y=data_numeric$y1
+# plot(data_numeric$x1, y, main="Absent 0-5 Days Percentage")
+# plot(data_numeric$x3, y, main="Absent 15+ Days Percentage")
+# plot(data_numeric$x4, y, main="Avg. Annual Salaries for Administrators")
+# plot(data_numeric$x5, y, main="Avg. Annual Salaries for Teachers")
+# plot(data_numeric$x7, y, main="Number of Teachers with a phd degree")
+# plot(data_numeric$x8, y, main="Total Number of Certified Teachers")
+# par(mfrow=c(2,3))
+# plot(data_numeric$x9, y, main="Post Graduate Percentage")
+# plot(data_numeric$x11, y, main="Teacher-Student Ratio")
+# plot(data_numeric$x12, y, main="White Student Percentage")
+# plot(data_numeric$x13, y, main="Black Student Percentage")
+# plot(data_numeric$x14, y, main="Econ.Disadv. Student Percentage")
+# plot(data_numeric$x16, y, main="Amount of Money Invested for Students")
+# par(mfrow=c(1,3))
+# plot(data_numeric$x17, y, main="Per-Pupil Expenditure at School Level")
+# plot(data_numeric$x18, y, main="Rate of Entries and Withdrawls to a School")
+# plot(data_numeric$x19, y, main="Percentage of Gifted Students")
+```
+
+
+## b. Multicollinearity
+```{r, echo=FALSE}
+# Multicollinearity
+library(dplyr)
+library(corrplot)
+par(mfrow=c(1, 2))
+# corrplot(cor(data_numeric, use="complete.obs"), method = 'color',
+#          tl.cex=0.7, tl.col="black")
+corrplot(cor(data_numeric, use="complete.obs"), method = 'pie', 
+         tl.cex=0.7, tl.col="black", type='upper')
+corrplot(cor(data_numeric[,!names(data_numeric)
+                          %in% c("x2", "x3","x4","x6","x8","x9","x10","x11")],
+             use="complete.obs"), method = 'pie', tl.col="black", type='upper')
+```
+Before doing the model selection process, a Multicollinearity check produces high correlation of (x1:x4), (x4:x6,x7), (x5:x7), (x9:x4,x5,x6), and (x12:x4,x5,x6,x8). And another set of variables that have a high correlation is y1 and y2, since we are modeling them separately as response variables, we do not need to drop any of them. The renewed plot is on the right. 
+
+```{r, echo=FALSE}
+# Multicollinearity Renewed
+library(dplyr)
+library(corrplot)
+# par(mfrow=c(1,2))
+# corrplot(cor(data_numeric[,!names(data_numeric) %in% c("x3","x4","x6","x8","x9","x10","x11")],
+#              use="complete.obs"), method = 'color', tl.col="black")
+```
+
+## d. Model Selection
+### 2019 Model Selection
+```{r, echo=FALSE}
+# Model Selection
+library(leaps)
+par(mfrow=c(1, 3), mai=c(0.8, 0.8, 0.8, 0.8))
+full_model <- regsubsets(y1~x1+x5+x7+x12+x13+x14+x15+x16+x17+x18+x19+x20,
+                         data=data_numeric, nbest=1, method = "exhaustive")
+all_sum = summary(full_model)
+adjr2_plot = plot(full_model, scale="adjr2")
+r2_plot = plot(full_model, scale="r2")
+Cp_plot = plot(full_model, scale="Cp")
+
+adj_Rsq = round(all_sum$adjr2*100, digit=1)
+Rsq = round(all_sum$rsq*100, digit=1)
+Cp = round(all_sum$cp, digit=1)
+SSE = all_sum$rss
+
+# Calculating S
+k = as.numeric(rownames(all_sum$which))
+n = full_model$nn
+S = round(sqrt(all_sum$rss/(n-(k+1))), digit=2) 
+
+# Calculating AIC
+SSTO = sum((All.Students.Math.Achievement
+            - mean(All.Students.Math.Achievement))^2)
+aic = round(2*(k+1)+n*log(SSE/n),digits=2)
+SSE = round(SSE,digits=2)
+
+# Combine the measures with models
+# cbind(Rsq, adj_Rsq, Cp, S, aic, all_sum$outmat)
+
+# Stepwise
+# library("olsrr")
+# full_model = lm(y1~x1+x2+x5+x7+x12+x13+x14+x15+x16+x17+x18+x19+x20,
+#                 data=data_numeric)
+# ols_step_forward_p(full_model, penter = 0.1, details = TRUE)
+# ols_step_backward_p(full_model, prem = 0.2, details = TRUE)
+# ols_step_both_p(full_model, pent = 0.1, prem = 0.2, details = TRUE)
+```
+
+### 2021 Model Selection
+```{r, echo=FALSE}
+# Model Selection
+library(leaps)
+par(mfrow=c(1, 3))
+all_model_2021 <- regsubsets(y2~x1+x5+x7+x12+x13+x14+x15+x16+x17+x18+x19+x20,
+                             data=data_numeric, nbest=1, method = "exhaustive")
+all_sum = summary(all_model_2021)
+adjr2_plot = plot(all_model_2021, scale="adjr2")
+r2_plot = plot(all_model_2021, scale="r2")
+Cp_plot = plot(all_model_2021, scale="Cp")
+
+Rsq = round(all_sum$rsq*100, digit=1)
+adj_Rsq = round(all_sum$adjr2*100, digit=1)
+Cp = round(all_sum$cp, digit=1)
+SSE = all_sum$rss
+
+# Calculating S
+k = as.numeric(rownames(all_sum$which))
+n = all_model_2021$nn
+S = round(sqrt(all_sum$rss/(n-(k+1))), digit=2) 
+
+# Calculating AIC
+SSTO = sum((X2021.All.Students.Math.Achievement
+            - mean(X2021.All.Students.Math.Achievement))^2)
+aic = round(2*(k+1)+n*log(SSE/n),digits=2)
+SSE = round(SSE,digits=2)
+
+# Combine the measures with models
+# cbind(Rsq, adj_Rsq, Cp, S, aic, all_sum$outmat)
+```
+
+## d. Best Model
+```{r, echo=FALSE}
+par(mfrow=c(1, 2))
+# 2019
+best_model_2019 = lm(y1~x1+x5+x7+x12+x13+x14+x19+x20, data=data_numeric)
+# summary(best_model_2019)
+# 2021
+best_model_2021 = lm(y2~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+# summary(best_model_2021)
+# library(stargazer)
+# stargazer(best_model_2019, best_model_2021, title="Best Models", align=TRUE, type="text")
+library(modelsummary)
+library(kableExtra)
+models <- list(
+  "2019 Best Model" = best_model_2019,
+  "2021 Best Model" = best_model_2021
+)
+modelsummary(models)
+```
+Based on the model selection, the best model for the 2019 Math Achievement Rate consists of independent variables of 'Absent 0-5 Days Percentage', 'Avg. Annual Salaries for Teachers', 'Number of Teachers with a phd degree', 'White Student Percentage', 'Black Student Percentage', 'Economically Disadvantaged Student Percentage', 'Percentage of Gifted Students', and 'Urban/Rural Area of the School'. The best model for the 2021 Math Achievement Rate consists of independent variables of 'Absent 0-5 Days Percentage', 'Avg. Annual Salaries for Teachers', 'Number of Teachers with a phd degree', 'White Student Percentage', 'Economically Disadvantaged Student Percentage', 'Amount of Money Invested for Students', 'Per-Pupil Expenditure at School Level', and 'Urban/Rural Area of the School'.
+
+## e. Best Model (Outlier Excluded)
+### 2019
+```{r, include=FALSE}
+# Outliers:
+k = length(best_model_2019$coefficients) - 1
+n = length(All.Students.Math.Achievement)
+LV_Cutoff = 2*(k+1)/n
+Hat_i = hatvalues(best_model_2019)
+outliers = Hat_i[Hat_i > LV_Cutoff]
+outliers_index = names(outliers)
+data_numeric$index <- 1:nrow(data_numeric)
+data_excluded <- data_numeric[! data_numeric$index %in% outliers_index,]
+# Reperform Model
+best_model_2019_excluded = lm(y1~x1+x2+x5+x7+x12+x14+x17+x19, data=data_excluded)
+summary(best_model_2019_excluded)
+```
+
+### 2021
+```{r, include=FALSE}
+# Outliers:
+k = length(best_model_2021$coefficients) - 1
+n = length(X2021.All.Students.Math.Achievement)
+LV_Cutoff = 2*(k+1)/n
+Hat_i = hatvalues(best_model_2021)
+outliers = Hat_i[Hat_i > LV_Cutoff]
+outliers_index = names(outliers)
+data_numeric$index <- 1:nrow(data_numeric)
+data_excluded <- data_numeric[! data_numeric$index %in% outliers_index,]
+# Reperform Model
+best_model_2021_excluded = lm(y2~x1+x5+x7+x12+x14+x16+x17+x20, data=data_excluded)
+summary(best_model_2021_excluded)
+```
+
+## f. Normality Check
+```{r, echo=FALSE}
+library(nortest)
+ad.test(resid(best_model_2019))
+ad.test(resid(best_model_2021))
+# Normal Probability Plot
+qqnorm(resid(best_model_2019), pch=16, col="blue", main="2019 Model")
+qqline(resid(best_model_2019), col="red", lwd=2)
+qqnorm(resid(best_model_2021), pch=16, col="blue", main="2021 Model")
+qqline(resid(best_model_2021), col="red", lwd=2)
+```
+
+## g. Transformation
+### 2019
+```{r, echo=FALSE}
+# 2019
+trans_y1 = sqrt(data_numeric$y1)
+trans_y2 = data_numeric$y1^(0.25)
+trans_y3 = log(data_numeric$y1)
+
+model = lm(y1~x1+x2+x5+x7+x12+x14+x17+x19, data=data_numeric)
+summary(model)
+model1 = lm(trans_y1~x1+x2+x5+x7+x12+x14+x17+x19, data=data_numeric)
+summary(model1)
+model2 = lm(trans_y2~x1+x2+x5+x7+x12+x14+x17+x19, data=data_numeric)
+summary(model2)
+model3 = lm(trans_y3~x1+x2+x5+x7+x12+x14+x17+x19, data=data_numeric)
+summary(model3)
+
+# Normal Prob. Plots
+par(mfrow=c(1,4), mai=c(0.7,0.7,0.4,0.1))
+qqnorm(resid(model),pch=16, main="y")
+qqline(resid(model),col="red", lwd=2)
+qqnorm(resid(model1),pch=16, main=bquote(sqrt(y)))
+qqline(resid(model1),col="red",lwd=2)
+qqnorm(resid(model2),pch=16,main=bquote(y^0.25))
+qqline(resid(model2),col="red", lwd=2)
+qqnorm(resid(model3),pch=16, main=bquote(ln(y)))
+qqline(resid(model3),col="red",lwd=2)
+```
+
+### 2021
+```{r, echo=FALSE}
+# 2019
+trans_y1_21 = sqrt(data_numeric$y2)
+trans_y2_21 = (data_numeric$y2)^(0.25)
+trans_y3_21 = log(data_numeric$y2)
+
+model = lm(y2~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+summary(model)
+model1 = lm(trans_y1_21~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+summary(model1)
+model2 = lm(trans_y2_21~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+summary(model2)
+model3 = lm(trans_y3_21~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+summary(model3)
+
+# Normal Prob. Plots
+par(mfrow=c(1,4), mai=c(0.7,0.7,0.4,0.1))
+qqnorm(resid(model),pch=16, main="y")
+qqline(resid(model),col="red", lwd=2)
+qqnorm(resid(model1),pch=16, main=bquote(sqrt(y)))
+qqline(resid(model1),col="red",lwd=2)
+qqnorm(resid(model2),pch=16,main=bquote(y^0.25))
+qqline(resid(model2),col="red", lwd=2)
+qqnorm(resid(model3),pch=16, main=bquote(ln(y)))
+qqline(resid(model3),col="red",lwd=2)
+```
+
+## h. Influential Points
+```{r, echo=FALSE}
+# 2019
+cooks_distance = cooks.distance(best_model_2019)
+k = length(best_model_2019$coefficients) - 1
+n = length(data_numeric$y1)
+F_0.5 = qf(1-0.5, k+1, n-k-1)
+F_0.8 = qf(1-0.8, k+1, n-k-1)
+# Influential:
+cooks_distance[cooks_distance > F_0.5]
+# In Between
+# cooks_distance[cooks_distance < F_0.5 & cooks_distance > F_0.8]
+
+# 2021
+cooks_distance = cooks.distance(best_model_2021)
+k = length(best_model_2021$coefficients) - 1
+n = length(data_numeric$y2)
+F_0.5 = qf(1-0.5, k+1, n-k-1)
+F_0.8 = qf(1-0.8, k+1, n-k-1)
+# Influential:
+cooks_distance[cooks_distance > F_0.5]
+# In Between
+# cooks_distance[cooks_distance < F_0.5 & cooks_distance > F_0.8]
+```
+
+## VIF
+```{r, echo=FALSE}
+# VIF -> Multicollinearity
+library(car)
+vif(best_model_2019)
+vif(best_model_2021)
+```
+
+## 7. Residual Plot
+```{r}
+# Residual Plot
+# plot(data_numeric$y2, resid(best_model_2021), pch=16, col="blue")
+# abline(0, 0, col = "red", lwd = 3)
+# plot(fitted(best_model_2021), resid(best_model_2021), pch=16, col="blue", ylab=bquote(paste("e")))
+# abline(0, 0, col = "red", lwd = 3)
+```
+
+
+# Category
+## 1. Urban & Rural
+```{r}
+urban = data[data$Urban.Rural == "Urban", ]
+rural = data[data$Urban.Rural == "Rural", ]
+```
+
+Testing if mean of Urban and Rural Math Achievement Rates are equal
+$$
+\begin{aligned}
+H_0 &: \mu_{Urban} - \mu_{Rural} = 0\\
+H_0 &: \mu_{Urban} - \mu_{Rural} > 1\\
+p-value &= 0.006737 < \alpha = 0.05 \rightarrow Reject \ H_0
+\end{aligned}
+$$
+```{r}
+mean(urban$All.Students.Math.Achievement)
+mean(rural$All.Students.Math.Achievement)
+t.test(urban$All.Students.Math.Achievement, rural$All.Students.Math.Achievement,
+       mu=1, alternative='greater')
+```
+
+
+## 2. Race
+Testing if the difference in mean of White and Black Math Achievement Rates is greater than 13
+$$
+\begin{aligned}
+H_0 &: \mu_{White} - \mu_{Black} = 0\\
+H_0 &: \mu_{White} - \mu_{Black} > 13\\
+p-value &= 0.004886 < \alpha = 0.05 \rightarrow Reject \ H_0
+\end{aligned}
+$$
+```{r}
+mean(data$White.Math.Achievement)
+mean(data$Black.Math.Achievement)
+t.test(data$White.Math.Achievement, data$Black.Math.Achievement,
+       mu=13, alternative='greater')
+```
+
+```{r}
+mean(urban$White.Percentage)
+mean(rural$White.Percentage)
+mean(urban$Black.Percentage)
+mean(rural$Black.Percentage)
+```
+
+## 3. Economy
+```{r}
+# 100% Econ Disadv Percentage
+Econ_Dia_100 = data[data$Econ.Disadvantaged.Percentage == '100', ]
+Econ_Dia_100_urban = Econ_Dia_100[Econ_Dia_100$Urban.Rural == "Urban",]
+Econ_Dia_100_rural = Econ_Dia_100[Econ_Dia_100$Urban.Rural == "Rural",]
+# 2019
+c(mean(Econ_Dia_100_urban$All.Students.Math.Achievement), 
+  mean(Econ_Dia_100_rural$All.Students.Math.Achievement))
+# 2021
+c(mean(Econ_Dia_100_urban$X2021.All.Students.Math.Achievement), 
+  mean(Econ_Dia_100_rural$X2021.All.Students.Math.Achievement))
+```
+
+$$
+\begin{aligned}
+H_0 &: \mu_{Rural \ EconDis} - \mu_{Urban \ EconDis} = 0\\
+H_0 &: \mu_{Rural \ EconDis} - \mu_{Urban \ EconDis} > 15\\
+p-&value = 0.04061 < \alpha = 0.05 \rightarrow Reject \ H_0
+\end{aligned}
+$$
+```{r}
+mean(urban$Econ.Disadvantaged.Percentage)
+mean(rural$Econ.Disadvantaged.Percentage)
+t.test(rural$Econ.Disadvantaged.Percentage, urban$Econ.Disadvantaged.Percentage ,
+       mu=15, alternative='greater')
+```
+
+## 4. Teacher Certificates
+$$
+\begin{aligned}
+H_0 &: \mu_{Urban \ Certificates} - \mu_{Rural \ Certificates} = 0\\
+H_0 &: \mu_{Urban \ Certificates} - \mu_{Rural \ Certificates} > 10\\
+p-&value = 0.001039 < \alpha = 0.05 \rightarrow Reject \ H_0
+\end{aligned}
+$$
+```{r}
+# Number of total certificates at school level
+mean(urban$Total)
+mean(rural$Total)
+t.test(urban$Total, rural$Total,
+       mu=10, alternative='greater')
+```
+
+
+# Reference
+[1] Mervosh, Sarah. “The Pandemic Erased Two Decades of Progress in Math and Reading.” The New York Times, The New York Times, 1 Sept. 2022, https://www.nytimes.com/2022/09/01/us/national-test-scores-math-reading- pandemic.html?smid=nytcore-ios-share&referringSource=articleShare.
+$\newline$
+$\newline$
+[2] Stern, Paul. “The Pandemic Worsened Racial Achievement Gaps. Making up the Difference Won't Be Easy.” CT Mirror, 23 May 2022, https://ctmirror.org/2022/05/22/the-pandemic-worsened-racial- achievement-gaps-making-up-the-difference-wont-be-easy/.
+$\newline$
+$\newline$
+[3] Georgia Department of Education. CCRPI Reports. Retrieved from https://www.gadoe.org/CCRPI/Pages/default.aspx
+$\newline$
+$\newline$
+[4] The Governor’s Office of Student Achievement. Downloadable Dataset. Retrieved from https://gosa.georgia.gov/dashboards-data-report-card/downloadable-data
