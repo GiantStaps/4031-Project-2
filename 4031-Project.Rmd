@@ -47,48 +47,57 @@ data$u.r_dummy <- as.character(data$u.r_dummy)
 data$u.r_dummy[data$u.r_dummy == "Urban"] <- 1
 data$u.r_dummy[data$u.r_dummy == "Rural"] <- 0
 data$u.r_dummy <- as.numeric(data$u.r_dummy)
-data$growth.rate.math <-data$X19.21.Difference.in.Math / data$All.Students.Math.Achievement
+data$growth.rate.math <-data$X19.21.Difference.in.Math
 ```
+
+```{r export}
+# write.csv(data$All.Students.Math.Achievement, "all_students_math_achievement.csv")
+```
+Exporting the data to ExpertFit to fit distribution and test normality. 
 
 ## a. Data Summary
 ``` {r data_description, echo=FALSE}
 #2019
+n_math_2019 = length(data$All.Students.Math.Achievement)
 mean_math_2019 = mean(data$All.Students.Math.Achievement)
 median_math_2019 = median(data$All.Students.Math.Achievement)
 range_math_2019_lower = min(data$All.Students.Math.Achievement)
 range_math_2019_upper = max(data$All.Students.Math.Achievement) 
+sd_math_2019 = sd(data$All.Students.Math.Achievement)
 #2021
+n_math_2021 = length(data$X2021.All.Students.Math.Achievement)
 mean_math_2021 = mean(data$X2021.All.Students.Math.Achievement)
 median_math_2021 = median(data$X2021.All.Students.Math.Achievement)
 range_math_2021_lower = min(data$X2021.All.Students.Math.Achievement)
 range_math_2021_upper = max(data$X2021.All.Students.Math.Achievement)
+sd_math_2021 = sd(data$X2021.All.Students.Math.Achievement)
+```
+
+```{r data normality}
+library(nortest)
+ad.test(data$All.Students.Math.Achievement)
 ```
 
 ```{r, echo=FALSE}
 library(huxtable)
-ht <- hux(firstcol = c('', 'Avg. Math achievement', 'Median Math achievement', 
+ht <- hux(firstcol = c('', 'Observations', 'Avg. Math achievement', 
+                       'Median Math achievement', 
                        'Lower Bound of Math achievement',
-                       'Upper Bound of Math achievement'),
-          a2019 = c('2019', mean_math_2019, median_math_2019,
-                    range_math_2019_lower, range_math_2019_upper),
-          a2021 = c('2021', mean_math_2021, median_math_2021,
-                    range_math_2021_lower, range_math_2021_upper),
+                       'Upper Bound of Math achievement',
+                       'Standard Deviation'),
+          a2019 = c('2019', n_math_2019, mean_math_2019, median_math_2019,
+                    range_math_2019_lower, range_math_2019_upper, sd_math_2019),
+          a2021 = c('2021', n_math_2021, mean_math_2021, median_math_2021,
+                    range_math_2021_lower, range_math_2021_upper, sd_math_2021),
           add_colnames = FALSE)
 bold(ht)[1,]           <- TRUE
 align(ht)[,2]          <- "left"
 font_size(ht)          <- 9
 col_width(ht)          <- c(1.6, 1, 1)
 number_format(ht[2,])  <- 2
-head(theme_plain(ht), 5L)
+head(theme_plain(ht), 7L)
 ```
-
-Avg. Math achievement across all students in 2019: $\fbox{67.99686463672}$.\
-Median Math achievement across all students in 2019: $\fbox{69.34}$.\
-Range of Math achievement across all students in 2019: $\fbox{[2.88, 100]}$.\
-
-Avg. Math achievement across all students in 2021: $\fbox{52.2312059089539}$.\
-Median Math achievement across all students in 2021: $\fbox{52.24}$.\
-Range of Math achievement across all students in 2021: $\fbox{[0, 100]}$.
+Mean and median Math test achievement rates are higher in 2019 than in 2021. 
 
 ```{r}
 #average change in achievement rate
@@ -125,7 +134,7 @@ y_values_1 <- dnorm(x_values_1, mean = mean(data$X2021.All.Students.Math.Achieve
 y_values_1 <- y_values_1 * diff(h2$mids[1:2]) * length(data$X2021.All.Students.Math.Achievement) 
 lines(x_values_1, y_values_1, lwd = 2)
 ```
-From both years' histogram, it can be confirmed that there is a very low frequency of math achievement rate between 0-30 for the 2019 data, as compared to the 2021 data. More outliers in the 2019 data could mean a higher . From plain sight, the 2019 data is better approximated by a normal distribution. The 2021 data seems skewed to the center. 
+From both years' histogram, it can be confirmed that there is a very low frequency of math achievement rate between 0-30 for the 2019 data, as compared to the 2021 data. More outliers in the 2019 data could mean a higher . From plain sight, the 2019 data is better approximated by a normal distribution. The 2021 data seems skewed to the center.
 
 ## d. Table of Variables
 ```{r, echo=FALSE}
