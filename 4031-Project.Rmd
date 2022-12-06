@@ -330,15 +330,14 @@ data_numeric_backup = data_numeric
 
 # Removing outliers for each variable using 1.5 IQR method
 for (i in 1:(ncol(data_numeric)-2)) {
-  quartiles <- quantile(data_numeric[ ,i], probs=c(.25, .75), na.rm=FALSE)
-  IQR <- IQR(data_numeric[ ,i])
+  quartiles <- quantile(data_numeric[ ,i], probs=c(.25, .75), na.rm=TRUE)
+  IQR <- IQR(data_numeric[ ,i], na.rm=TRUE)
   Lower <- quartiles[1] - 1.5*IQR
   Upper <- quartiles[2] + 1.5*IQR 
   data_numeric[ ,i][(data_numeric[ ,i] < Lower) | (data_numeric[ ,i] > Upper)] <- NaN
 }
+
 # Plot Without Outliers
-
-
 # Histograms
 library(tidyr)
 c1 <- rgb(173,216,230,max = 255, alpha = 80, names = "lt.blue")
@@ -348,11 +347,8 @@ par(mfrow=c(2,3))
 for (i in 1:6) {
   A = data_numeric[data_numeric$x20 == 1, ][, i]
   B = data_numeric[data_numeric$x20 == 0, ][, i]
-  b <- min(c(A,B), na.rm = TRUE)
-  e <- max(c(A,B), na.rm = TRUE)
-  ax <- pretty(b:e, n = 12)
-  hgA <- hist(A, breaks = ax, plot = FALSE) # Save first histogram data
-  hgB <- hist(B, breaks = ax, plot = FALSE) # Save 2nd histogram data
+  hgA <- hist(A, breaks = 12, plot = FALSE, na.rm = TRUE) # Save first histogram data
+  hgB <- hist(B, breaks = 12, plot = FALSE, na.rm = TRUE) # Save 2nd histogram data
   plot(hgA, col = c1, main = names(data_numeric)[i])
   plot(hgB, col = c2, add = TRUE)
 }
@@ -361,11 +357,8 @@ par(mfrow=c(2,3))
 for (i in 7:10) {
   A = data_numeric[data_numeric$x20 == 1, ][, i]
   B = data_numeric[data_numeric$x20 == 0, ][, i]
-  b <- min(c(A,B), na.rm = TRUE)
-  e <- max(c(A,B), na.rm = TRUE)
-  ax <- pretty(b:e, n = 12)
-  hgA <- hist(A, breaks = ax, plot = FALSE) # Save first histogram data
-  hgB <- hist(B, breaks = ax, plot = FALSE) # Save 2nd histogram data
+  hgA <- hist(A, breaks = 12, plot = FALSE) # Save first histogram data
+  hgB <- hist(B, breaks = 12, plot = FALSE) # Save 2nd histogram data
   plot(hgA, col = c1, main = names(data_numeric)[i])
   plot(hgB, col = c2, add = TRUE)
 }
@@ -373,11 +366,8 @@ for (i in 7:10) {
 for (i in 12:13) {
   A = data_numeric[data_numeric$x20 == 1, ][, i]
   B = data_numeric[data_numeric$x20 == 0, ][, i]
-  b <- min(c(A,B), na.rm = TRUE)
-  e <- max(c(A,B), na.rm = TRUE)
-  ax <- pretty(b:e, n = 12)
-  hgA <- hist(A, breaks = ax, plot = FALSE) # Save first histogram data
-  hgB <- hist(B, breaks = ax, plot = FALSE) # Save 2nd histogram data
+  hgA <- hist(A, breaks = 12, plot = FALSE) # Save first histogram data
+  hgB <- hist(B, breaks = 12, plot = FALSE) # Save 2nd histogram data
   plot(hgA, col = c1, main = names(data_numeric)[i])
   plot(hgB, col = c2, add = TRUE)
 }
@@ -428,26 +418,19 @@ par(mfrow=c(1, 2))
 #          tl.cex=0.7, tl.col="black")
 corrplot(cor(data_numeric, use="complete.obs"), method = 'pie', 
          tl.cex=0.7, tl.col="black", type='upper')
-corrplot(cor(data_numeric[,!names(data_numeric)
-                          %in% c("x2", "x3","x4","x6","x8","x9","x10","x11")],
+corrplot(cor(data_numeric[,!names(data_numeric) %in% c("x1","x8","x10")],
              use="complete.obs"), method = 'pie', tl.col="black", type='upper')
 ```
 
+Rewrite!
+
 Before doing the model selection process, a Multicollinearity check
-produces high correlation of (x1:x4), (x4:x6,x7), (x5:x7),
+produces high correlation of (x1:x2,x3), (x8:x10,x16), (x5:x7),
 (x9:x4,x5,x6), and (x12:x4,x5,x6,x8). And another set of variables that
 have a high correlation is y1 and y2, since we are modeling them
 separately as response variables, we do not need to drop any of them.
 The renewed plot is on the right.
 
-```{r, echo=FALSE}
-# Multicollinearity Renewed
-library(dplyr)
-library(corrplot)
-# par(mfrow=c(1,2))
-# corrplot(cor(data_numeric[,!names(data_numeric) %in% c("x3","x4","x6","x8","x9","x10","x11")],
-#              use="complete.obs"), method = 'color', tl.col="black")
-```
 
 ## d. Model Selection
 
@@ -457,7 +440,8 @@ library(corrplot)
 # Model Selection
 library(leaps)
 par(mfrow=c(1, 3), mai=c(0.8, 0.8, 0.8, 0.8))
-full_model <- regsubsets(y1~x1+x5+x7+x12+x13+x14+x15+x16+x17+x18+x19+x20,
+full_model <- regsubsets(y1~x2+x3+x4+x5+x6+x7+x9+x11+x12
+                         +x13+x14+x15+x16+x17+x18+x19+x20,
                          data=data_numeric, nbest=1, method = "exhaustive")
 all_sum = summary(full_model)
 adjr2_plot = plot(full_model, scale="adjr2")
@@ -498,7 +482,8 @@ SSE = round(SSE,digits=2)
 # Model Selection
 library(leaps)
 par(mfrow=c(1, 3))
-all_model_2021 <- regsubsets(y2~x1+x5+x7+x12+x13+x14+x15+x16+x17+x18+x19+x20,
+all_model_2021 <- regsubsets(y2~x2+x3+x4+x5+x6+x7+x9+x11+x12
+                             +x13+x14+x15+x16+x17+x18+x19+x20,
                              data=data_numeric, nbest=1, method = "exhaustive")
 all_sum = summary(all_model_2021)
 adjr2_plot = plot(all_model_2021, scale="adjr2")
@@ -642,30 +627,31 @@ qqline(resid(model3),col="red",lwd=2)
 ### 2021
 
 ```{r, echo=FALSE}
-# 2019
-trans_y1_21 = sqrt(data_numeric$y2)
-trans_y2_21 = (data_numeric$y2)^(0.25)
-trans_y3_21 = log(data_numeric$y2)
-
-model = lm(y2~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
-summary(model)
-model1 = lm(trans_y1_21~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
-summary(model1)
-model2 = lm(trans_y2_21~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
-summary(model2)
-model3 = lm(trans_y3_21~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
-summary(model3)
-
-# Normal Prob. Plots
-par(mfrow=c(1,4), mai=c(0.7,0.7,0.4,0.1))
-qqnorm(resid(model),pch=16, main="y")
-qqline(resid(model),col="red", lwd=2)
-qqnorm(resid(model1),pch=16, main=bquote(sqrt(y)))
-qqline(resid(model1),col="red",lwd=2)
-qqnorm(resid(model2),pch=16,main=bquote(y^0.25))
-qqline(resid(model2),col="red", lwd=2)
-qqnorm(resid(model3),pch=16, main=bquote(ln(y)))
-qqline(resid(model3),col="red",lwd=2)
+# # 2021
+# data_numeric$y2[!is.na(data_numeric$y2)]
+# trans_y1_21 = sqrt(data_numeric$y2)
+# trans_y2_21 = (data_numeric$y2)^(0.25)
+# trans_y3_21 = log(data_numeric$y2)
+# 
+# model = lm(y2~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+# summary(model)
+# model1 = lm(trans_y1_21~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+# summary(model1)
+# model2 = lm(trans_y2_21~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+# summary(model2)
+# model3 = lm(trans_y3_21~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+# summary(model3)
+# 
+# # Normal Prob. Plots
+# par(mfrow=c(1,4), mai=c(0.7,0.7,0.4,0.1))
+# qqnorm(resid(model),pch=16, main="y")
+# qqline(resid(model),col="red", lwd=2)
+# qqnorm(resid(model1),pch=16, main=bquote(sqrt(y)))
+# qqline(resid(model1),col="red",lwd=2)
+# qqnorm(resid(model2),pch=16,main=bquote(y^0.25))
+# qqline(resid(model2),col="red", lwd=2)
+# qqnorm(resid(model3),pch=16, main=bquote(ln(y)))
+# qqline(resid(model3),col="red",lwd=2)
 ```
 
 ## h. Influential Points
