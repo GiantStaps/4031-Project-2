@@ -2,20 +2,60 @@
 title: "ISyE 4031 T09 - Georgia Achievement Gaps in K-12 Schools with Regression"
 author: "Ruwei Ma, Yichen Ma, Yang Yang"
 output: pdf_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
+
 # 1. Introduction
-Covid-19 had brought a big impact to the education system across US. National test results for 2022 reveal the pandemic’s devastating effects on American schoolchildren, with the performance of 9-year-olds in math and reading dropping to the lowest levels from two decades ago [1]. This lagging effect from the pandemic applies to all races and income levels and sparks a collective decline in academics for the generation that experienced school closures, frequent reliance on virtual and remote learning, and other pandemic effects. The setbacks will occupy the low-performing students for up to 9 months to catch up with the average, prompting an urgent need for the underlying solution to the achievement gap [2]. This setback further adds to, and likely aggravates, the pre-pandemic disparity in student achievement outcomes for vulnerable and at-risk student populations, especially in Georgia. Based on some of my preliminary analysis of the 2021 achievement data across 2,180 schools in Georgia, we found that there are 2 prominent factors that affect achievement rate: the student’s economic status and race. The achievement rate in 2021 of economically disadvantaged students is 46.11%, compared to 52.32% across all students. A similar gap can be observed in the difference in achievement rate between white and black students in Georgia, the former as high as 66.99%, compared to the 39.88% of the latter. The gap within the economically-disadvantaged students’ group is vast and depends on the county or school they attend. Further analysis at the school level shows strong correlation between achievement rate and the school’s other demographics.
+
+Covid-19 had brought a big impact to the education system across US.
+National test results for 2022 reveal the pandemic's devastating effects
+on American schoolchildren, with the performance of 9-year-olds in math
+and reading dropping to the lowest levels from two decades ago [1]. This
+lagging effect from the pandemic applies to all races and income levels
+and sparks a collective decline in academics for the generation that
+experienced school closures, frequent reliance on virtual and remote
+learning, and other pandemic effects. The setbacks will occupy the
+low-performing students for up to 9 months to catch up with the average,
+prompting an urgent need for the underlying solution to the achievement
+gap [2]. This setback further adds to, and likely aggravates, the
+pre-pandemic disparity in student achievement outcomes for vulnerable
+and at-risk student populations, especially in Georgia. Based on some of
+my preliminary analysis of the 2021 achievement data across 2,180
+schools in Georgia, we found that there are 2 prominent factors that
+affect achievement rate: the student's economic status and race. The
+achievement rate in 2021 of economically disadvantaged students is
+46.11%, compared to 52.32% across all students. A similar gap can be
+observed in the difference in achievement rate between white and black
+students in Georgia, the former as high as 66.99%, compared to the
+39.88% of the latter. The gap within the economically-disadvantaged
+students' group is vast and depends on the county or school they attend.
+Further analysis at the school level shows strong correlation between
+achievement rate and the school's other demographics.
 
 # 2. Problem Goal
-We aim to adopt regression modeling to identify gaps in national test achievement rates between different demographic groups in Georgia, and recommend robust strategies to address such disparities. Specifically, the objectives are: (1) visualize the disparities in school resources, such as teacher certifications and FTE (Full-time Equivalent), and quantify its correlation with the student’s achievement outcomes, especially among marginalized minority groups (e.g., White, Black, vs. Hispanic students, economically disadvantaged vs. affluent students, and rural vs. Urban schools) (2) quantify the achievement gap at the county level across Georgia’s 159 counties at the school level to identify factors that predict student achievement and highlight intervention or resource allocation strategies, and (3) evaluate the impact and predict the trajectory of the policies and strategies produced from step 2 with adjustments. 
 
-# 3. Executive Summary 
+We aim to adopt regression modeling to identify gaps in national test
+achievement rates between different demographic groups in Georgia, and
+recommend robust strategies to address such disparities. Specifically,
+the objectives are: (1) visualize the disparities in school resources,
+such as teacher certifications and FTE (Full-time Equivalent), and
+quantify its correlation with the student's achievement outcomes,
+especially among marginalized minority groups (e.g., White, Black, vs.
+Hispanic students, economically disadvantaged vs. affluent students, and
+rural vs. Urban schools) (2) quantify the achievement gap at the county
+level across Georgia's 159 counties at the school level to identify
+factors that predict student achievement and highlight intervention or
+resource allocation strategies, and (3) evaluate the impact and predict
+the trajectory of the policies and strategies produced from step 2 with
+adjustments.
 
-
-
+# 3. Executive Summary
 
 # 4. Data Description
-``` {r data_prep, include=FALSE}
+
+```{r data_prep, include=TRUE}
 # Input Dataset
 library(readxl)
 library(dplyr)
@@ -35,10 +75,26 @@ Enrollment = select(Enrollment, INSTN_NAME, ENROLL_PCT_GIFTED)
 data = merge(Achievement_Rate, Percentage, by="School.Name")
 data = merge(data, Salaries, by="School.Name")
 data = merge(data, Absent_Rate, by="School.Name")
-data = merge(data, School_Expenditure, by.x="School.Name", by.y="schoolname")
-data = merge(data, Poverty.Percentage, by.x="School.Name", by.y="SCHOOL_NAME")
-data = merge(data, Mobility, by.x="School.Name", by.y="school_name")
-data = merge(data, Enrollment, by.x="School.Name", by.y="INSTN_NAME")
+
+data = left_join(
+          data %>% group_by(School.Name) %>% mutate(id = row_number()),
+          School_Expenditure %>% group_by(schoolname) %>% mutate(id = row_number()),
+          by = c("School.Name" = "schoolname", "id"))
+
+data = left_join(
+          data %>% group_by(School.Name) %>% mutate(id = row_number()),
+          Poverty.Percentage %>% group_by(SCHOOL_NAME) %>% mutate(id = row_number()),
+          by = c("School.Name" = "SCHOOL_NAME", "id"))
+
+data = left_join(
+          data %>% group_by(School.Name) %>% mutate(id = row_number()),
+          Mobility %>% group_by(school_name) %>% mutate(id = row_number()),
+          by = c("School.Name" = "school_name", "id"))
+
+data = left_join(
+          data %>% group_by(School.Name) %>% mutate(id = row_number()),
+          Enrollment %>% group_by(INSTN_NAME) %>% mutate(id = row_number()),
+          by = c("School.Name" = "INSTN_NAME", "id"))
 attach(data)
 
 # Creating a Dummy Variable for Urban/Rural
@@ -51,21 +107,23 @@ data$growth.rate.math <-data$X19.21.Difference.in.Math
 ```
 
 ```{r export}
-# write.csv(data$All.Students.Math.Achievement, "all_students_math_achievement.csv")
+write.csv(data, "merged_data.csv")
 ```
-Exporting the data to ExpertFit to fit distribution and test normality. 
+
+Exporting the data to ExpertFit to fit distribution and test normality.
 
 ## a. Data Summary
-``` {r data_description, echo=FALSE}
+
+```{r data_description, echo=FALSE}
 #2019
-n_math_2019 = integer(length(data$All.Students.Math.Achievement))
+n_math_2019 = length(data$All.Students.Math.Achievement)
 mean_math_2019 = mean(data$All.Students.Math.Achievement)
 median_math_2019 = median(data$All.Students.Math.Achievement)
 range_math_2019_lower = min(data$All.Students.Math.Achievement)
 range_math_2019_upper = max(data$All.Students.Math.Achievement) 
 sd_math_2019 = sd(data$All.Students.Math.Achievement)
 #2021
-n_math_2021 = integer(length(data$X2021.All.Students.Math.Achievement))
+n_math_2021 = length(data$X2021.All.Students.Math.Achievement)
 mean_math_2021 = mean(data$X2021.All.Students.Math.Achievement)
 median_math_2021 = median(data$X2021.All.Students.Math.Achievement)
 range_math_2021_lower = min(data$X2021.All.Students.Math.Achievement)
@@ -97,7 +155,9 @@ col_width(ht)          <- c(1.6, 1, 1)
 number_format(ht[2,])  <- 2
 head(theme_plain(ht), 7L)
 ```
-Mean and median Math test achievement rates are higher in 2019 than in 2021. 
+
+Mean and median Math test achievement rates are higher in 2019 than in
+2021.
 
 ```{r}
 #average change in achievement rate
@@ -105,20 +165,27 @@ Mean and median Math test achievement rates are higher in 2019 than in 2021.
 ```
 
 ## c. Data Visulization
+
 ```{r boxplots, echo=FALSE}
 #boxplots
 par(mfrow=c(1,2))
 b1<-boxplot(data$All.Students.Math.Achievement,main = "2019 Math Achievement Rate")
 b2<-boxplot(data$X2021.All.Students.Math.Achievement, main="2021 Math Achievement Rate")
 ```
-The boxplot of both years' math achievement rate shows that in 2019, the data distribution is more compact, and all quartiles are significantly higher than those in 2021. A tremendous number of outliers are identified in both year's boxplots, suggesting many data points below the lower quartile by more than 1.5 interquartile range (IQR). Achievement rates are highly left skewed. 
+
+The boxplot of both years' math achievement rate shows that in 2019, the
+data distribution is more compact, and all quartiles are significantly
+higher than those in 2021. A tremendous number of outliers are
+identified in both year's boxplots, suggesting many data points below
+the lower quartile by more than 1.5 interquartile range (IQR).
+Achievement rates are highly left skewed.
 
 ```{r histogram, echo=FALSE}
 #histogram for 2019, 2021
 
 par(mfrow=c(1,2))
 h1 <-hist(data$All.Students.Math.Achievement,main = "2019 Math Achievement Rate",xlab="2019 All Students Math Achievement Rate", 
-     ylim = c(0,900), breaks=10,xlim = c(0,100))
+     ylim = c(0,3000), breaks=10,xlim = c(0,100))
 
 #2019 normal curve
 x_values <- seq(min(data$All.Students.Math.Achievement), max(data$All.Students.Math.Achievement), length = 100)
@@ -127,16 +194,22 @@ y_values <- y_values * diff(h1$mids[1:2]) * length(data$All.Students.Math.Achiev
 lines(x_values, y_values, lwd = 2)
 
 #2021 normal curve
-h2 <- hist(data$X2021.All.Students.Math.Achievement,main = "2021 Math Achievement Rate", xlab = "2021 All Students Math Achievement Rate",
-     ylim = c(0,900), breaks=10,xlim = c(0,100))
+h2 <- hist(data$X2021.All.Students.Math.Achievement,main = "2021 Math Achievement Rate", xlab = "Math Test Score",
+     ylim = c(0,3000), breaks=10,xlim = c(0,100))
 x_values_1 <- seq(min(data$X2021.All.Students.Math.Achievement), max(data$X2021.All.Students.Math.Achievement), length = 100)
 y_values_1 <- dnorm(x_values_1, mean = mean(data$X2021.All.Students.Math.Achievement), sd = sd(data$X2021.All.Students.Math.Achievement)) 
 y_values_1 <- y_values_1 * diff(h2$mids[1:2]) * length(data$X2021.All.Students.Math.Achievement) 
 lines(x_values_1, y_values_1, lwd = 2)
 ```
-From both years' histogram, it can be confirmed that there is a very low frequency of math achievement rate between 0-30 for the 2019 data, as compared to the 2021 data. More outliers in the 2019 data could mean a higher . From plain sight, the 2019 data is better approximated by a normal distribution. The 2021 data seems skewed to the center.
+
+From both years' histogram, it can be confirmed that there is a very low
+frequency of math achievement rate between 0-30 for the 2019 data, as
+compared to the 2021 data. More outliers in the 2019 data could mean a
+higher . From plain sight, the 2019 data is better approximated by a
+normal distribution. The 2021 data seems skewed to the center.
 
 ## d. Table of Variables
+
 ```{r, echo=FALSE}
 library(huxtable)
 ht <- hux(Variables = c('y1', 'y2', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6',
@@ -178,6 +251,7 @@ number_format(ht)      <- 0
 ```
 
 \newpage
+
 ```{r, echo=FALSE}
 head(theme_plain(ht), 24L)
 ```
@@ -185,13 +259,17 @@ head(theme_plain(ht), 24L)
 # 5. Regression Analysis
 
 ## a. Iterations of the analysis process
-- paragraph description
 
+-   paragraph description
 
 \newpage
-## c. Plots of variables- Scatterplot 
-For the plots below, a light blue color indicates Urban Area and a light pink color indicates Rural Area. 
-``` {r scatterplot, echo=FALSE}
+
+## c. Plots of variables- Scatterplot
+
+For the plots below, a light blue color indicates Urban Area and a light
+pink color indicates Rural Area.
+
+```{r scatterplot, echo=FALSE}
 # Only Includes the Numeric Data
 library(dplyr)
 data_numeric = select_if(data, is.numeric)
@@ -339,8 +417,8 @@ for (i in 14:19) {
 # plot(data_numeric$x19, y, main="Percentage of Gifted Students")
 ```
 
-
 ## b. Multicollinearity
+
 ```{r, echo=FALSE}
 # Multicollinearity
 library(dplyr)
@@ -354,7 +432,13 @@ corrplot(cor(data_numeric[,!names(data_numeric)
                           %in% c("x2", "x3","x4","x6","x8","x9","x10","x11")],
              use="complete.obs"), method = 'pie', tl.col="black", type='upper')
 ```
-Before doing the model selection process, a Multicollinearity check produces high correlation of (x1:x4), (x4:x6,x7), (x5:x7), (x9:x4,x5,x6), and (x12:x4,x5,x6,x8). And another set of variables that have a high correlation is y1 and y2, since we are modeling them separately as response variables, we do not need to drop any of them. The renewed plot is on the right. 
+
+Before doing the model selection process, a Multicollinearity check
+produces high correlation of (x1:x4), (x4:x6,x7), (x5:x7),
+(x9:x4,x5,x6), and (x12:x4,x5,x6,x8). And another set of variables that
+have a high correlation is y1 and y2, since we are modeling them
+separately as response variables, we do not need to drop any of them.
+The renewed plot is on the right.
 
 ```{r, echo=FALSE}
 # Multicollinearity Renewed
@@ -366,7 +450,9 @@ library(corrplot)
 ```
 
 ## d. Model Selection
+
 ### 2019 Model Selection
+
 ```{r, echo=FALSE}
 # Model Selection
 library(leaps)
@@ -407,6 +493,7 @@ SSE = round(SSE,digits=2)
 ```
 
 ### 2021 Model Selection
+
 ```{r, echo=FALSE}
 # Model Selection
 library(leaps)
@@ -439,6 +526,7 @@ SSE = round(SSE,digits=2)
 ```
 
 ## d. Best Model
+
 ```{r, echo=FALSE}
 par(mfrow=c(1, 2))
 # 2019
@@ -457,10 +545,24 @@ models <- list(
 )
 modelsummary(models)
 ```
-Based on the model selection, the best model for the 2019 Math Achievement Rate consists of independent variables of 'Absent 0-5 Days Percentage', 'Avg. Annual Salaries for Teachers', 'Number of Teachers with a phd degree', 'White Student Percentage', 'Black Student Percentage', 'Economically Disadvantaged Student Percentage', 'Percentage of Gifted Students', and 'Urban/Rural Area of the School'. The best model for the 2021 Math Achievement Rate consists of independent variables of 'Absent 0-5 Days Percentage', 'Avg. Annual Salaries for Teachers', 'Number of Teachers with a phd degree', 'White Student Percentage', 'Economically Disadvantaged Student Percentage', 'Amount of Money Invested for Students', 'Per-Pupil Expenditure at School Level', and 'Urban/Rural Area of the School'.
+
+Based on the model selection, the best model for the 2019 Math
+Achievement Rate consists of independent variables of 'Absent 0-5 Days
+Percentage', 'Avg. Annual Salaries for Teachers', 'Number of Teachers
+with a phd degree', 'White Student Percentage', 'Black Student
+Percentage', 'Economically Disadvantaged Student Percentage',
+'Percentage of Gifted Students', and 'Urban/Rural Area of the School'.
+The best model for the 2021 Math Achievement Rate consists of
+independent variables of 'Absent 0-5 Days Percentage', 'Avg. Annual
+Salaries for Teachers', 'Number of Teachers with a phd degree', 'White
+Student Percentage', 'Economically Disadvantaged Student Percentage',
+'Amount of Money Invested for Students', 'Per-Pupil Expenditure at
+School Level', and 'Urban/Rural Area of the School'.
 
 ## e. Best Model (Outlier Excluded)
+
 ### 2019
+
 ```{r, include=FALSE}
 # Outliers:
 k = length(best_model_2019$coefficients) - 1
@@ -477,6 +579,7 @@ summary(best_model_2019_excluded)
 ```
 
 ### 2021
+
 ```{r, include=FALSE}
 # Outliers:
 k = length(best_model_2021$coefficients) - 1
@@ -493,6 +596,7 @@ summary(best_model_2021_excluded)
 ```
 
 ## f. Normality Check
+
 ```{r, echo=FALSE}
 library(nortest)
 ad.test(resid(best_model_2019))
@@ -505,7 +609,9 @@ qqline(resid(best_model_2021), col="red", lwd=2)
 ```
 
 ## g. Transformation
+
 ### 2019
+
 ```{r, echo=FALSE}
 # 2019
 trans_y1 = sqrt(data_numeric$y1)
@@ -534,6 +640,7 @@ qqline(resid(model3),col="red",lwd=2)
 ```
 
 ### 2021
+
 ```{r, echo=FALSE}
 # 2019
 trans_y1_21 = sqrt(data_numeric$y2)
@@ -562,6 +669,7 @@ qqline(resid(model3),col="red",lwd=2)
 ```
 
 ## h. Influential Points
+
 ```{r, echo=FALSE}
 # 2019
 cooks_distance = cooks.distance(best_model_2019)
@@ -587,6 +695,7 @@ cooks_distance[cooks_distance > F_0.5]
 ```
 
 ## VIF
+
 ```{r, echo=FALSE}
 # VIF -> Multicollinearity
 library(car)
@@ -595,6 +704,7 @@ vif(best_model_2021)
 ```
 
 ## 7. Residual Plot
+
 ```{r}
 # Residual Plot
 # plot(data_numeric$y2, resid(best_model_2021), pch=16, col="blue")
@@ -603,22 +713,23 @@ vif(best_model_2021)
 # abline(0, 0, col = "red", lwd = 3)
 ```
 
-
 # Category
+
 ## 1. Urban & Rural
+
 ```{r}
 urban = data[data$Urban.Rural == "Urban", ]
 rural = data[data$Urban.Rural == "Rural", ]
 ```
 
-Testing if mean of Urban and Rural Math Achievement Rates are equal
-$$
+Testing if mean of Urban and Rural Math Achievement Rates are equal $$
 \begin{aligned}
 H_0 &: \mu_{Urban} - \mu_{Rural} = 0\\
 H_0 &: \mu_{Urban} - \mu_{Rural} > 1\\
 p-value &= 0.006737 < \alpha = 0.05 \rightarrow Reject \ H_0
 \end{aligned}
 $$
+
 ```{r}
 mean(urban$All.Students.Math.Achievement)
 mean(rural$All.Students.Math.Achievement)
@@ -626,16 +737,17 @@ t.test(urban$All.Students.Math.Achievement, rural$All.Students.Math.Achievement,
        mu=1, alternative='greater')
 ```
 
-
 ## 2. Race
-Testing if the difference in mean of White and Black Math Achievement Rates is greater than 13
-$$
+
+Testing if the difference in mean of White and Black Math Achievement
+Rates is greater than 13 $$
 \begin{aligned}
 H_0 &: \mu_{White} - \mu_{Black} = 0\\
 H_0 &: \mu_{White} - \mu_{Black} > 13\\
 p-value &= 0.004886 < \alpha = 0.05 \rightarrow Reject \ H_0
 \end{aligned}
 $$
+
 ```{r}
 mean(data$White.Math.Achievement)
 mean(data$Black.Math.Achievement)
@@ -651,6 +763,7 @@ mean(rural$Black.Percentage)
 ```
 
 ## 3. Economy
+
 ```{r}
 # 100% Econ Disadv Percentage
 Econ_Dia_100 = data[data$Econ.Disadvantaged.Percentage == '100', ]
@@ -671,6 +784,7 @@ H_0 &: \mu_{Rural \ EconDis} - \mu_{Urban \ EconDis} > 15\\
 p-&value = 0.04061 < \alpha = 0.05 \rightarrow Reject \ H_0
 \end{aligned}
 $$
+
 ```{r}
 mean(urban$Econ.Disadvantaged.Percentage)
 mean(rural$Econ.Disadvantaged.Percentage)
@@ -679,6 +793,7 @@ t.test(rural$Econ.Disadvantaged.Percentage, urban$Econ.Disadvantaged.Percentage 
 ```
 
 ## 4. Teacher Certificates
+
 $$
 \begin{aligned}
 H_0 &: \mu_{Urban \ Certificates} - \mu_{Rural \ Certificates} = 0\\
@@ -686,6 +801,7 @@ H_0 &: \mu_{Urban \ Certificates} - \mu_{Rural \ Certificates} > 10\\
 p-&value = 0.001039 < \alpha = 0.05 \rightarrow Reject \ H_0
 \end{aligned}
 $$
+
 ```{r}
 # Number of total certificates at school level
 mean(urban$Total)
@@ -694,15 +810,19 @@ t.test(urban$Total, rural$Total,
        mu=10, alternative='greater')
 ```
 
-
 # Reference
-[1] Mervosh, Sarah. “The Pandemic Erased Two Decades of Progress in Math and Reading.” The New York Times, The New York Times, 1 Sept. 2022, https://www.nytimes.com/2022/09/01/us/national-test-scores-math-reading- pandemic.html?smid=nytcore-ios-share&referringSource=articleShare.
-$\newline$
-$\newline$
-[2] Stern, Paul. “The Pandemic Worsened Racial Achievement Gaps. Making up the Difference Won't Be Easy.” CT Mirror, 23 May 2022, https://ctmirror.org/2022/05/22/the-pandemic-worsened-racial- achievement-gaps-making-up-the-difference-wont-be-easy/.
-$\newline$
-$\newline$
-[3] Georgia Department of Education. CCRPI Reports. Retrieved from https://www.gadoe.org/CCRPI/Pages/default.aspx
-$\newline$
-$\newline$
-[4] The Governor’s Office of Student Achievement. Downloadable Dataset. Retrieved from https://gosa.georgia.gov/dashboards-data-report-card/downloadable-data
+
+[1] Mervosh, Sarah. "The Pandemic Erased Two Decades of Progress in Math
+and Reading." The New York Times, The New York Times, 1 Sept. 2022,
+<https://www.nytimes.com/2022/09/01/us/national-test-scores-math-reading->
+pandemic.html?smid=nytcore-ios-share&referringSource=articleShare.
+$\newline$ $\newline$ [2] Stern, Paul. "The Pandemic Worsened Racial
+Achievement Gaps. Making up the Difference Won't Be Easy." CT Mirror, 23
+May 2022,
+<https://ctmirror.org/2022/05/22/the-pandemic-worsened-racial->
+achievement-gaps-making-up-the-difference-wont-be-easy/. $\newline$
+$\newline$ [3] Georgia Department of Education. CCRPI Reports. Retrieved
+from <https://www.gadoe.org/CCRPI/Pages/default.aspx> $\newline$
+$\newline$ [4] The Governor's Office of Student Achievement.
+Downloadable Dataset. Retrieved from
+<https://gosa.georgia.gov/dashboards-data-report-card/downloadable-data>
