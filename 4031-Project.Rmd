@@ -648,13 +648,13 @@ trans_y1 = sqrt(data_numeric$y1)
 trans_y2 = data_numeric$y1^(0.25)
 trans_y3 = log(data_numeric$y1)
 
-model = lm(y1~x1+x2+x5+x7+x12+x14+x17+x19, data=data_numeric)
+model = lm(y1~x1+x3+x5+x7+x11+x14+x15+x19, data=data_numeric)
 summary(model)
-model1 = lm(trans_y1~x1+x2+x5+x7+x12+x14+x17+x19, data=data_numeric)
+model1 = lm(trans_y1~x1+x3+x5+x7+x11+x14+x15+x19, data=data_numeric)
 summary(model1)
-model2 = lm(trans_y2~x1+x2+x5+x7+x12+x14+x17+x19, data=data_numeric)
+model2 = lm(trans_y2~x1+x3+x5+x7+x11+x14+x15+x19, data=data_numeric)
 summary(model2)
-model3 = lm(trans_y3~x1+x2+x5+x7+x12+x14+x17+x19, data=data_numeric)
+model3 = lm(trans_y3~x1+x3+x5+x7+x11+x14+x15+x19, data=data_numeric)
 summary(model3)
 
 # Normal Prob. Plots
