@@ -478,12 +478,13 @@ The renewed plot is on the right.
 library(leaps)
 par(mfrow=c(1, 3), mai=c(0.8, 0.8, 0.8, 0.8))
 full_model <- regsubsets(y1~x2+x3+x4+x5+x6+x7+x9+x11+x12
-                         +x13+x14+x15+x16+x17+x18+x19+x20,
+                         +x14+x15+x16+x17+x18+x19+x20,
                          data=data_numeric, nbest=1, method = "exhaustive")
 all_sum = summary(full_model)
 adjr2_plot = plot(full_model, scale="adjr2")
 r2_plot = plot(full_model, scale="r2")
 Cp_plot = plot(full_model, scale="Cp")
+cbind(Rsq, adj_Rsq, Cp, S, SSE, aic, all_sum$outmat)
 
 adj_Rsq = round(all_sum$adjr2*100, digit=1)
 Rsq = round(all_sum$rsq*100, digit=1)
