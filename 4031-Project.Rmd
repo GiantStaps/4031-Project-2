@@ -477,16 +477,18 @@ The renewed plot is on the right.
 # Model Selection
 library(leaps)
 par(mfrow=c(1, 3), mai=c(0.8, 0.8, 0.8, 0.8))
-full_model <- regsubsets(y1~.,
+full_model <- regsubsets(y1~.-y2,
                          data=data_numeric, nbest=1, method = "exhaustive")
 all_sum = summary(full_model)
 adjr2_plot = plot(full_model, scale="adjr2")
 r2_plot = plot(full_model, scale="r2")
 Cp_plot = plot(full_model, scale="Cp")
-model_final = all_sum$which[8, ]
-model_final = model_final[model_final == TRUE]
-model_final
-# cbind(Rsq, adj_Rsq, Cp, S, SSE, aic, all_sum$outmat)
+model_final_2019 = all_sum$which[8, ]
+model_final_2019 = model_final_2019[model_final_2019 == TRUE]
+print(names(model_final_2019))
+# Combine the measures with models
+# cbind(Rsq, adj_Rsq, Cp, S, aic, all_sum$outmat)
+
 
 adj_Rsq = round(all_sum$adjr2*100, digit=1)
 Rsq = round(all_sum$rsq*100, digit=1)
@@ -504,14 +506,11 @@ SSTO = sum((All.Students.Math.Achievement
 aic = round(2*(k+1)+n*log(SSE/n),digits=2)
 SSE = round(SSE,digits=2)
 
-# Combine the measures with models
-# cbind(Rsq, adj_Rsq, Cp, S, aic, all_sum$outmat)
-
 # Stepwise
-# library("olsrr")
-# full_model = lm(y1~.,
-#                 data=data_numeric)
-# ols_step_both_p(full_model, pent = 0.1, prem = 0.2, details = TRUE)
+library("olsrr")
+full_model = lm(y1~.-y2, data=data_numeric)
+ols_step_forward_p(full_model, penter = 0.1, details = TRUE)
+#ols_step_both_p(full_model, pent = 0.1, prem = 0.2, details = TRUE)
 ```
 
 ### 2021 Model Selection
@@ -520,12 +519,16 @@ SSE = round(SSE,digits=2)
 # Model Selection
 library(leaps)
 par(mfrow=c(1, 3))
-all_model_2021 <- regsubsets(y2~.,
+all_model_2021 <- regsubsets(y2~.-y1,
                              data=data_numeric, nbest=1, method = "exhaustive")
 all_sum = summary(all_model_2021)
 adjr2_plot = plot(all_model_2021, scale="adjr2")
 r2_plot = plot(all_model_2021, scale="r2")
 Cp_plot = plot(all_model_2021, scale="Cp")
+print(all_sum$which)
+model_final_2021= all_sum$which[8, ]
+model_final_2021= model_final_2021[model_final_2021== TRUE]
+print(names(model_final_2021))
 
 Rsq = round(all_sum$rsq*100, digit=1)
 adj_Rsq = round(all_sum$adjr2*100, digit=1)
@@ -545,6 +548,11 @@ SSE = round(SSE,digits=2)
 
 # Combine the measures with models
 # cbind(Rsq, adj_Rsq, Cp, S, aic, all_sum$outmat)
+
+# Stepwise
+library("olsrr")
+full_model = lm(y2~.-y1, data=data_numeric)
+ols_step_forward_p(full_model, penter = 0.1, details = TRUE)
 ```
 
 ## d. Best Model
@@ -552,10 +560,10 @@ SSE = round(SSE,digits=2)
 ```{r, echo=FALSE}
 par(mfrow=c(1, 2))
 # 2019
-best_model_2019 = lm(y1~x1+x5+x7+x12+x13+x14+x19+x20, data=data_numeric)
+best_model_2019 = lm(y1~x1+x3+x5+x7+x11+x14+x15+x19, data=data_numeric)
 # summary(best_model_2019)
 # 2021
-best_model_2021 = lm(y2~x1+x5+x7+x12+x14+x16+x17+x20, data=data_numeric)
+best_model_2021 = lm(y2~x3+x5+x11+x14+x15+x17+x19, data=data_numeric)
 # summary(best_model_2021)
 # library(stargazer)
 # stargazer(best_model_2019, best_model_2021, title="Best Models", align=TRUE, type="text")
