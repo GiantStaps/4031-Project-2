@@ -106,12 +106,6 @@ data$u.r_dummy <- as.numeric(data$u.r_dummy)
 data$growth.rate.math <-data$X19.21.Difference.in.Math
 ```
 
-```{r export}
-write.csv(data, "merged_data.csv")
-```
-
-Exporting the data to ExpertFit to fit distribution and test normality.
-
 ## a. Data Summary
 
 ```{r data_description, echo=FALSE}
@@ -131,10 +125,31 @@ range_math_2021_upper = max(data$X2021.All.Students.Math.Achievement)
 sd_math_2021 = sd(data$X2021.All.Students.Math.Achievement)
 ```
 
-```{r data normality}
+```{r data normality, include = FALSE}
 library(nortest)
 ad.test(data$All.Students.Math.Achievement)
+ad.test(data$X2021.All.Students.Math.Achievement)
 ```
+
+```{r qqplot, echo =FALSE}
+qqnorm(data$All.Students.Math.Achievement, pch = 1, frame = FALSE)
+qqline(data$All.Students.Math.Achievement, col = "steelblue", lwd = 2)
+qqnorm(data$X2021.All.Students.Math.Achievement, pch = 1, frame = FALSE)
+qqline(data$X2021.All.Students.Math.Achievement, col = "steelblue", lwd = 2)
+```
+
+```{r export, include = FALSE}
+# Write merged data to a csv for examination and distribution fitting.
+write.csv(data, "all_data.csv")
+```
+
+```{r CI, echo = FALSE}
+test_model_2019 = lm(data$All.Students.Math.Achievement~1)
+confint(test_model_2019)
+test_model_2021 = lm(data$X2021.All.Students.Math.Achievement~1)
+confint(test_model_2021)
+```
+We are 95% confident that the mean student achivement rate in Math in 2021 is higher than that in 2019.
 
 ```{r, echo=FALSE}
 library(huxtable)
@@ -185,7 +200,7 @@ Achievement rates are highly left skewed.
 
 par(mfrow=c(1,2))
 h1 <-hist(data$All.Students.Math.Achievement,main = "2019 Math Achievement Rate",xlab="2019 All Students Math Achievement Rate", 
-     ylim = c(0,3000), breaks=10,xlim = c(0,100))
+     ylim = c(0,500), breaks=10,xlim = c(0,100))
 
 #2019 normal curve
 x_values <- seq(min(data$All.Students.Math.Achievement), max(data$All.Students.Math.Achievement), length = 100)
@@ -195,7 +210,7 @@ lines(x_values, y_values, lwd = 2)
 
 #2021 normal curve
 h2 <- hist(data$X2021.All.Students.Math.Achievement,main = "2021 Math Achievement Rate", xlab = "Math Test Score",
-     ylim = c(0,3000), breaks=10,xlim = c(0,100))
+     ylim = c(0,500), breaks=10,xlim = c(0,100))
 x_values_1 <- seq(min(data$X2021.All.Students.Math.Achievement), max(data$X2021.All.Students.Math.Achievement), length = 100)
 y_values_1 <- dnorm(x_values_1, mean = mean(data$X2021.All.Students.Math.Achievement), sd = sd(data$X2021.All.Students.Math.Achievement)) 
 y_values_1 <- y_values_1 * diff(h2$mids[1:2]) * length(data$X2021.All.Students.Math.Achievement) 
@@ -421,13 +436,35 @@ corrplot(cor(data_numeric, use="complete.obs"), method = 'pie',
 corrplot(cor(data_numeric[,!names(data_numeric) %in% c("x1","x8","x10")],
              use="complete.obs"), method = 'pie', tl.col="black", type='upper')
 ```
+```{r flatten correlation matrix function, include = FALSE}
+# ++++++++++++++++++++++++++++
+# flattenCorrMatrix
+# ++++++++++++++++++++++++++++
+# cormat : matrix of the correlation coefficients
+# pmat : matrix of the correlation p-values
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  =(cormat)[ut],
+    p = pmat[ut]
+    )
+}
+```
 
-Rewrite!
+```{r detect highl correlation, echo = FALSE}
+library(Hmisc)
+corr_matrix = rcorr(as.matrix(data_numeric))
+flatten_corr_matrix = flattenCorrMatrix(corr_matrix$r, corr_matrix$P)
+# sort the flattened matrix by corr value
+flatten_corr_matrix[order(abs(flatten_corr_matrix$cor), decreasing = TRUE),]
+```
 
 Before doing the model selection process, a Multicollinearity check
-produces high correlation of (x1:x2,x3), (x8:x10,x16), (x5:x7),
-(x9:x4,x5,x6), and (x12:x4,x5,x6,x8). And another set of variables that
-have a high correlation is y1 and y2, since we are modeling them
+produces high correlation of (x1:x3), (x8:x10,x16), (x10:x16), (x12: x13), 
+(x11: x17), (x15: x13, x14). And another set of variables 
+that have a high correlation is y1 and y2, since we are modeling them
 separately as response variables, we do not need to drop any of them.
 The renewed plot is on the right.
 
